@@ -1,0 +1,98 @@
+- name: Installing packages for Nagios
+  tags: dependecies, libraries
+  apt:
+    name:
+      - autoconf
+      - python3-pip
+      - python3
+      - php
+      - gcc
+      - libc6
+      - wget
+      - make
+      - unzip
+      - apache2
+      - openssl
+      - libapache2-mod-php7.4
+      - libgd-dev
+      - libssl-dev
+      - libmcrypt-dev
+      - bc
+      - dc
+      - gawk
+      - build-essential
+      - snmp
+      - gettext
+      - libnet-snmp-perl
+    state: latest
+    update_cache: yes
+
+- name: Installing the passlib python package
+  pip:
+    name: passlib
+
+
+- name: Creating directory for the downloaded files
+  file:
+    path: ~/nagios
+    state: directory
+
+- name: Installation and extraction of Nagios
+  unarchive:
+    src: https://github.com/NagiosEnterprises/nagioscore/archive/nagios-4.4.6.tar.gz
+    dest: ~/nagios
+    remote_src: yes
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Compiling, Installing, and Creating users and group for nagios
+  shell: |
+    cd ~/nagios/nagioscore-*
+    sudo ./configure --with-httpd-conf=/etc/apache2/sites-enabled
+    sudo make all
+    sudo make install-groups-users
+    sudo usermod -a -G nagios www-data
+    sudo make install
+    sudo make install-daemoninit
+    sudo make install-commandmode
+    sudo make install-config
+    sudo make install-webconf
+    sudo a2enmod rewrite
+    sudo a2enmod cgi
+
+- name: Installation of Nagios plugins and extracting it
+  unarchive:
+    src: https://github.com/nagios-plugins/nagios-plugins/archive/release-2.3.3.tar.gz
+    dest: ~/nagios
+    remote_src: yes
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Compiling and Installing Nagios
+  shell: |
+    cd ~/nagios/nagios-plugins*
+    ./tools/setup
+    ./configure
+    make
+    make install
+
+
+- name: Adding the user to password file
+  community.general.htpasswd:
+    path: /usr/local/nagios/etc/htpasswd.users
+    name: bolivar_nagi
+    password: 12345
+
+- name: Starting and Restarting Nagios
+  service:
+    name: nagios
+    state: restarted
+    enabled: true
+
+- name: Starting and Restarting hhtpd
+  service:
+    name: apache2
+    state: restarted
+    enabled: true
